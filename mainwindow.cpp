@@ -23,11 +23,10 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->comboBox_rate->addItems(Header);
     ui->pushButton->setText("打开");
 
-
+    action = new QAction("read", this);
+    ui->tableWidget->addAction(action);
     ui->tableWidget->setContextMenuPolicy(Qt::ActionsContextMenu);
-    popMenu = new QMenu(ui->tableWidget);
-    this->action = new QAction("copy", this);
-    popMenu->addAction(action);
+    connect(action, SIGNAL(triggered()), this,SLOT(slot_read()));
 
     connect(ui->comboBox,SIGNAL(currentIndexChanged(const QString &)), this, SLOT(slot_update_serial_com(const QString &)));
     connect(ui->comboBox_rate, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(slot_serial_rate(const QString &)));
@@ -35,7 +34,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->tableWidget, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(slotItemEnter(QTableWidgetItem*)));
     //connect(ui->tableWidget, SIGNAL(itemActivated(QTableWidgetItem*)), this, SLOT(slot_send_read(QTableWidgetItem*)));
     connect(ui->tableWidget, SIGNAL(cellClicked(int,int)), this, SLOT(slot_send_read(int, int)));
-    connect(action, SIGNAL(triggered(bool)), this, SLOT(slot_right_click()));
+
 
 
 
@@ -71,24 +70,50 @@ void MainWindow::slotItemEnter(QTableWidgetItem *item)
 void MainWindow::slot_update_serial_com(const QString &)
 {
     qDebug()<<"click";
-
+    serial.setPortName(ui->comboBox->currentText());
 
 }
 
 void MainWindow::slot_serial_rate(const QString &)
 {
 
+
+    serial.setBaudRate(ui->comboBox_rate->currentText().toInt());
 }
 
 void MainWindow::slot_serial_openclose()
 {
+    if(serial.isOpen())
+    {
+        ui->pushButton->setText("打开");
+        serial.close();
+        qDebug()<<"close";
 
+    }
+    else
+    {
+
+        if(serial.open(QIODevice::ReadWrite))
+        {
+           ui->pushButton->setText("关闭");
+           qDebug()<<"open success";
+
+        }
+        else
+        {
+            ui->pushButton->setText("打开");
+            qDebug()<<"fail";
+        }
+
+    }
 
 }
 
 void MainWindow::slot_send_read(int x, int y)
 {
-    qDebug()<<"read";
+    qDebug()<<"read"<<x<<y;
+    xx = x;
+    yy = y;
 
 }
 
@@ -101,5 +126,12 @@ void MainWindow::slot_right_click()
 void MainWindow::mousePressEvent(QMouseEvent * event)
 {
     qDebug()<<"mouse event";
+
+}
+
+void MainWindow::slot_read()
+{
+    qDebug()<<"read register"<<xx<<yy;
+
 
 }

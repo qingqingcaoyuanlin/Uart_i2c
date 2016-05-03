@@ -5,6 +5,7 @@
 #include <QTableWidgetItem>
 #include <QAction>
 #include <QMenu>
+#include <QSerialPort>
 namespace Ui {
 class MainWindow;
 }
@@ -26,12 +27,15 @@ protected slots:
     void slot_send_read(int x, int y);
     void slotItemEnter(QTableWidgetItem *item);
     void slot_right_click();
+    void slot_read();
     void mousePressEvent(QMouseEvent * event);
 
 
 private:
     Ui::MainWindow *ui;
-   // QMap<QTableWidgetItem *, QString>fileMap;
+    int xx;
+    int yy;
+    QSerialPort serial;
 };
 
 #endif // MAINWINDOW_H
