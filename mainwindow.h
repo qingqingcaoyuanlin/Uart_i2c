@@ -9,7 +9,13 @@
 namespace Ui {
 class MainWindow;
 }
-
+typedef struct Serial_Data_
+{
+    uchar Slave_Add;    //从机地址
+    uchar Register;     //寄存器
+    uchar Value;        //值
+    uchar End_Flag;    //结束标志，0xFF
+}Serial_Data;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -19,6 +25,7 @@ public:
     ~MainWindow();
     QAction *action;
     QMenu *popMenu;
+    void Serial_Send(Serial_Data *serialData);
 protected slots:
     void slot_update_serial_com(const QString &text);
     void slot_serial_rate(const QString &text);
@@ -33,8 +40,8 @@ protected slots:
 
 private:
     Ui::MainWindow *ui;
-    int xx;
-    int yy;
+    unsigned char xx;
+    unsigned char yy;
     QSerialPort serial;
 };
 

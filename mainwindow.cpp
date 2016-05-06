@@ -112,8 +112,10 @@ void MainWindow::slot_serial_openclose()
 void MainWindow::slot_send_read(int x, int y)
 {
     qDebug()<<"read"<<x<<y;
-    xx = x;
-    yy = y;
+    xx = (unsigned char)x;
+    yy = (unsigned char)y;
+    int k = x<<4 | y;
+    qDebug()<<"k "<<k;
 
 }
 
@@ -129,9 +131,28 @@ void MainWindow::mousePressEvent(QMouseEvent * event)
 
 }
 
+void MainWindow::Serial_Send(Serial_Data *serialData)
+{
+    serial.write((char*)serialData, sizeof(Serial_Data));
+}
+
 void MainWindow::slot_read()
 {
     qDebug()<<"read register"<<xx<<yy;
-
+    uchar Register = xx<<4 |yy;
+    Serial_Data serialData;
+    serialData.Register = Register;
+    serialData.Value = 0;
+    serialData.End_Flag = 0xFF;
+    if(ui->lineEdit_Slave->text()==NULL)
+    {
+        serialData.Slave_Add = 0x01;
+    }
+    else
+    {
+        serialData.Slave_Add = (uchar)ui->lineEdit_Slave->text().toInt();
+    }
+    Serial_Send(&serialData);
 
 }
+

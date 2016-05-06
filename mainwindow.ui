@@ -66,7 +66,7 @@
      <string>PushButton</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="lineEdit">
+   <widget class="QLineEdit" name="lineEdit_Slave">
     <property name="geometry">
      <rect>
       <x>80</x>
@@ -89,7 +89,7 @@
      <string>从机地址</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="lineEdit_2">
+   <widget class="QLineEdit" name="lineEdit_Value">
     <property name="geometry">
      <rect>
       <x>60</x>
@@ -258,7 +258,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>25</height>
+     <height>23</height>
     </rect>
    </property>
   </widget>
