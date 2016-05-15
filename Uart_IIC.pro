@@ -16,8 +16,10 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     serialthread.cpp
 
+
 HEADERS  += mainwindow.h \
     serialthread.h
+
 
 FORMS    += mainwindow.ui
 

@@ -5,7 +5,10 @@
 #include <QtSerialPort/QSerialPortInfo>
 #include <QRegExp>
 #include <QValidator>
-
+#include <QTableWidgetItem>
+#include <QList>
+#include "serialthread.h"
+#include <QObject>
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -14,17 +17,25 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     ui->tableWidget->setColumnCount(16);
     ui->tableWidget->setRowCount(16);
+    ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectItems);
     ui->tableWidget->setMouseTracking(true);
     QStringList Header;
     Header<<"0"<<"1"<<"2"<<"3"<<"4"<<"5"<<"6"<<"7"<<"8"<<"9"<<"A"<<"B"<<"C"<<"D"<<"E"<<"F";
     ui->tableWidget->setHorizontalHeaderLabels(Header);
     ui->tableWidget->setVerticalHeaderLabels(Header);
+    ui->tableWidget->setContextMenuPolicy(Qt::ActionsContextMenu);
+    action = new QAction("read", this);
+    ui->tableWidget->addAction(action);
+    ui->tableWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
     foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
         ui->comboBox->addItem(info.portName());
+    ui->comboBox->setCurrentIndex(0);
     Header.clear();
     Header<<"9600"<<"12800"<<"115200";
     ui->comboBox_rate->addItems(Header);
+    ui->comboBox_rate->setCurrentIndex(0);
+
     ui->pushButton->setText("打开");
 
     //ui->lineEdit_Slave->inputMask();
@@ -35,15 +46,14 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lineEdit_Slave->setValidator(validator);
     ui->lineEdit_Slave->setMaxLength(2);            //限制输入格式
 
-    ui->comboBox->installEventFilter(this);
-    action = new QAction("read", this);
-    ui->tableWidget->addAction(action);
-    ui->tableWidget->setContextMenuPolicy(Qt::ActionsContextMenu);
+    //ui->comboBox->installEventFilter(this);
+
+
     connect(action, SIGNAL(triggered()), this,SLOT(slot_read()));
 
-    connect(ui->comboBox,SIGNAL(currentIndexChanged(const QString &)), this, SLOT(slot_update_serial_com(const QString &)));
+    //connect(ui->comboBox,SIGNAL(currentIndexChanged(const QString &)), this, SLOT(slot_update_serial_com(const QString &)));
     //connect(ui->comboBox,SIGNAL(highlighted(int index)), this, SLOT(slot_update_serial_com(const QString &)));
-    connect(ui->comboBox_rate, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(slot_serial_rate(const QString &)));
+    //connect(ui->comboBox_rate, SIGNAL(currentIndexChanged(const QString &)), this, SLOT(slot_serial_rate(const QString &)));
 
     connect(ui->pushButton, SIGNAL(clicked()), this, SLOT(slot_serial_openclose()));
     connect(ui->pushButton_Write, SIGNAL(clicked()), this, SLOT(slot_button_write()));
@@ -60,17 +70,20 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->checkBox_6, SIGNAL(toggled(bool)), this, SLOT(slot_Checkbox()));
     connect(ui->checkBox_7, SIGNAL(toggled(bool)), this, SLOT(slot_Checkbox()));
 
+    connect(&ser_Thread, SIGNAL(signal_read()), this, SLOT(slot_show_recv_data()));
+
 }
 
 MainWindow::~MainWindow()
 {
-    if(serial.isOpen())
-        serial.close();
+    if(ser_Thread.serial_port.isOpen())
+        ser_Thread.serial_port.close();
     delete ui;
 }
 
 void MainWindow::slotItemEnter(QTableWidgetItem *item)
 {
+    Serial_Data send_data;
     qDebug()<<"slotItemEnter";
     if(!item)
         return;
@@ -84,6 +97,18 @@ void MainWindow::slotItemEnter(QTableWidgetItem *item)
     if(ok)
     {
         qDebug()<<"number "<<num;
+        send_data.End_Flag = 0xFF;
+        send_data.Register = (xx<<4 |yy);
+        send_data.Value = (uchar)num;
+        if(ui->lineEdit_Slave->text() == NULL)
+        {
+            send_data.Slave_Add = 0x00;
+        }
+        else
+        {
+            send_data.Slave_Add = (uchar)ui->lineEdit_Slave->text().toInt();
+        }
+        Serial_Send(&send_data);
     }
     else
     {
@@ -94,7 +119,7 @@ void MainWindow::slotItemEnter(QTableWidgetItem *item)
 void MainWindow::slot_update_serial_com(const QString &)
 {
     qDebug()<<"click";
-    serial.setPortName(ui->comboBox->currentText());
+    ser_Thread.serial_port.setPortName(ui->comboBox->currentText());
     //foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts())
         //ui->comboBox->addItem(info.portName());
 
@@ -104,33 +129,42 @@ void MainWindow::slot_serial_rate(const QString &)
 {
 
 
-    serial.setBaudRate(ui->comboBox_rate->currentText().toInt());
+    ser_Thread.serial_port.setBaudRate(ui->comboBox_rate->currentText().toInt());
 }
 
 void MainWindow::slot_serial_openclose()
 {
-    if(serial.isOpen())
+    if(ser_Thread.serial_port.isOpen())
     {
         ui->pushButton->setText("打开");
-        serial.close();
+        ser_Thread.serial_port.close();
         qDebug()<<"close";
 
     }
     else
     {
-
-        if(serial.open(QIODevice::ReadWrite))
+        if(ui->comboBox->currentText()!= NULL)
         {
-           ui->pushButton->setText("关闭");
-           qDebug()<<"open success";
+            ser_Thread.serial_port.setBaudRate(ui->comboBox_rate->currentText().toInt());
+            ser_Thread.serial_port.setPortName(ui->comboBox->currentText());
 
+            if(ser_Thread.serial_port.open(QIODevice::ReadWrite))
+            {
+               ui->pushButton->setText("关闭");
+               ser_Thread.start();
+               qDebug()<<"open success";
+
+            }
+            else
+            {
+                ui->pushButton->setText("打开");
+                qDebug()<<"fail";
+            }
         }
         else
         {
-            ui->pushButton->setText("打开");
-            qDebug()<<"fail";
+            qDebug()<<"please set serial";
         }
-
     }
 
 }
@@ -159,7 +193,7 @@ void MainWindow::mousePressEvent(QMouseEvent * event)
 
 void MainWindow::Serial_Send(Serial_Data *serialData)
 {
-    serial.write((char*)serialData, sizeof(Serial_Data));
+    ser_Thread.serial_port.write((char*)serialData, sizeof(Serial_Data));
     //qDebug()<<"serial send";
 
 }
@@ -176,6 +210,7 @@ void write()
 }
 void MainWindow::slot_read()
 {
+#if 1
     qDebug()<<"read register"<<xx<<yy;
     uchar Register = xx<<4 |yy;
     Serial_Data serialData;
@@ -188,10 +223,39 @@ void MainWindow::slot_read()
     }
     else
     {
-        serialData.Slave_Add = (uchar)ui->lineEdit_Slave->text().toInt();
+        serialData.Slave_Add = (uchar)(ui->lineEdit_Slave->text().toInt() | 0x01);
     }
     Serial_Send(&serialData);
+#else
 
+    Serial_Data serialData;
+    int i =0;
+    QList<QTableWidgetItem *> items = ui->tableWidget->selectedItems();
+    qDebug()<<"List "<<items.count();
+    if(!items.isEmpty())
+    {
+        i = items.length();
+        foreach (QTableWidgetItem * item, items) {
+            serialData.Register = (uchar)(item->column()<<4) | (uchar)(item->row());
+            serialData.End_Flag = 0xFF;
+            serialData.Value = 0;
+            qDebug()<<"col"<<(item->column()<<4)<<"row"<<(item->row());
+            if(ui->lineEdit_Slave->text() == NULL)
+            {
+                serialData.Slave_Add = 0x01;
+            }
+            else
+            {
+                serialData.Slave_Add = (uchar)ui->lineEdit_Slave->text().toInt();
+            }
+
+        }
+    }
+    else
+    {
+        qDebug()<<"0";
+    }
+#endif
 }
 
 void MainWindow::slot_Checkbox()
@@ -242,7 +306,7 @@ void MainWindow::slot_Checkbox()
 }
 void MainWindow::slot_button_write()
 {
-    if(serial.isOpen())
+    if(ser_Thread.serial_port.isOpen())
     {
         uchar Register = xx<<4 |yy;
         Serial_Data serialData;
@@ -265,3 +329,49 @@ void MainWindow::slot_button_write()
     }
 
 }
+
+void MainWindow::slot_serial_read()
+{
+    static qint16 number = 0;
+}
+
+void MainWindow::slot_show_recv_data()
+{
+    Serial_Data *recv_data;
+    QString str;
+    uchar array[4] = {0};
+    int i = 0;
+    int j = 0;
+
+    //while(ser_Thread.Data_Rx.length() > 0)
+    {
+
+        qDebug()<<ser_Thread.Data_Rx.length();
+        for(j=0; j<(volatile)ser_Thread.Data_Rx.length()/4; j++)
+        {
+            for(i=0; i<4; i++)
+            {
+                array[i] = ser_Thread.Data_Rx.at(i+4*j);
+            }
+            recv_data = (Serial_Data *)(&array);
+            if(recv_data->Slave_Add & 0x01 == 0x01 && recv_data->End_Flag == 0xFF)
+            {
+               // ui->tableWidget->setCurrentCell(recv_data->Register&0xF0, recv_data->Register&0x0F);
+               // ui->tableWidget->cu
+                //sprintf(str, "%02X", recv_data->Value);
+                //str = QString().arg(recv_data->Value);
+                str = QString::number(recv_data->Value,16);
+                qDebug()<<str;
+
+
+                qDebug()<<"row"<<((recv_data->Register&0xF0)>>4);
+                qDebug()<<"line"<<(recv_data->Register&0x0F);
+                disconnect(ui->tableWidget, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(slotItemEnter(QTableWidgetItem*)));
+                ui->tableWidget->setItem(((recv_data->Register&0xF0)>>4), recv_data->Register&0x0F, new QTableWidgetItem(str));
+                connect(ui->tableWidget, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(slotItemEnter(QTableWidgetItem*)));
+           }
+        }
+        ser_Thread.Data_Rx.clear();
+    }
+}
+

@@ -43,7 +43,7 @@ public:
     ~MainWindow();
     QAction *action;
     QMenu *popMenu;
-
+    SerialThread ser_Thread;
     void Serial_Send(Serial_Data *serialData);
 protected slots:
     void slot_update_serial_com(const QString &text);
@@ -57,14 +57,17 @@ protected slots:
     void mousePressEvent(QMouseEvent * event);
     void slot_Checkbox();
     void slot_button_write();
-
+    void slot_serial_read();
+    void slot_show_recv_data();
+signals:
+    void testsignal();
 private:
     Ui::MainWindow *ui;
     unsigned char xx;
     unsigned char yy;
     uchar check_value;
-    QSerialPort serial;
-    SerialThread ser_Thread;
+    //QSerialPort serial;
+
 };
 
 #endif // MAINWINDOW_H
